@@ -13,6 +13,7 @@ router.get("/me", protect, (req, res) => {
         user: {
             id: req.user._id,
             name: req.user.name,
+            collegeName: req.user.collegeName,
             email: req.user.email
         }
     });
