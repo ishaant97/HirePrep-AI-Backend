@@ -6,6 +6,6 @@ const { saveResume } = require('../controllers/resume.controller');
 const router = express.Router();
 
 // Save resume
-router.post("/", protect, saveResume)
+router.post("/save", protect, saveResume)
 
 module.exports = router;
