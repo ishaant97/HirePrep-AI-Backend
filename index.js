@@ -2,6 +2,7 @@ const express = require('express');
 const connectToMongoDB = require('./connections/mongodbConfig');
 const cookieParser = require('cookie-parser');
 const authRoutes = require('./routes/auth.route');
+const geminiRoutes = require('./routes/gemini.route');
 const cors = require('cors');
 require('dotenv').config();
 
@@ -17,6 +18,7 @@ app.use(cors({
 }));
 
 app.use('/api/auth', authRoutes);
+app.use('/api/gemini', geminiRoutes);
 
 app.listen(process.env.PORT || 3000, () => {
     console.log(`Server is running at http://localhost:${process.env.PORT || 3000}`);
