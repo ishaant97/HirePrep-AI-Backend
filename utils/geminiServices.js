@@ -21,6 +21,9 @@ const getGeminiResponse = async (req, res) => {
         const result = await model.generateContent(prompt);
         const responseText = result.response.text();
 
+        // const response = await model.generateContent(prompt);
+        // res.status(200).json(response);
+
         // 4. Send the response back to the client
         res.status(200).json({
             success: true,
