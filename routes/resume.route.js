@@ -1,11 +1,12 @@
 const express = require('express');
-const Resume = require('../models/resume.model');
+const multer = require('multer');
 const protect = require('../middlewares/auth.middleware');
-const { saveResume } = require('../controllers/resume.controller');
+const { saveResume, parseResumeText } = require('../controllers/resume.controller');
 
 const router = express.Router();
+const upload = multer();
 
-// Save resume
 router.post("/save", protect, saveResume)
+router.post("/parseResume", protect, upload.single('resume'), parseResumeText)
 
 module.exports = router;
