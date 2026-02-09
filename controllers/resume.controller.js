@@ -16,8 +16,8 @@ async function saveResume(req, res) {
             message: "Resume saved successfully",
         });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: "Failed to save resume" });
+        // console.error(error);
+        res.status(500).json({ message: "Failed to save resume, " + error.message });
     }
 }
 
@@ -29,9 +29,9 @@ async function parseResumeText(req, res) {
 
         const text = await parseResumePDF(req.file.buffer);
         res.json(await geminiExtractedInfoOfResume(text));
-    } catch (err) {
-        console.error("Resume parse error:", err);
-        res.status(500).json({ error: "Failed to parse resume" });
+    } catch (error) {
+        // console.error("Resume parse error:", error);
+        res.status(500).json({ error: "Failed to parse resume, " + error.message });
     }
 }
 

@@ -7,6 +7,11 @@ const resumeSchema = new mongoose.Schema(
             ref: "User",
             required: true,
         },
+        originalFileName: {
+            type: String,
+            required: true,
+            trim: true
+        },
         name: {
             type: String,
             required: true,
@@ -93,7 +98,7 @@ const resumeSchema = new mongoose.Schema(
         internships: [{
             company: { type: String, required: true },
             role: { type: String, required: true }
-        }]
+        }],
     },
     { timestamps: true }
 );
