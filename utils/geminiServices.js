@@ -111,7 +111,7 @@ CRITICAL OUTPUT RULES (MANDATORY):
   "communication_rating": Number,
 
   "skills": [String],
-  "project": [String],
+  "projects": [String],
   "certifications": [String],
 
   "hackathon": "Yes" | "No",
@@ -167,7 +167,7 @@ Hackathon Participation: Yes"
   "desired_role": "Full Stack Developer",
   "communication_rating": null,
   "skills": ["JavaScript", "React", "Node.js", "MongoDB"],
-  "project": ["Smart Attendance System", "E-commerce Website"],
+  "projects": ["Smart Attendance System", "E-commerce Website"],
   "certifications": ["AWS Cloud Practitioner"],
   "hackathon": "Yes",
   "internships": [
@@ -186,7 +186,7 @@ ${resumeText}`;
 
     try {
         const model = genAI.getGenerativeModel({
-            model: "gemma-3-27b-it"  // Use valid Gemini model
+            model: "gemma-3-27b-it"
         });
 
         const result = await model.generateContent(prompt);

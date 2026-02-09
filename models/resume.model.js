@@ -12,6 +12,11 @@ const resumeSchema = new mongoose.Schema(
             required: true,
             trim: true
         },
+        resumePdfUrl: {
+            type: String,
+            required: true,
+            trim: true
+        },
         name: {
             type: String,
             required: true,
