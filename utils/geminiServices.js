@@ -105,7 +105,7 @@ CRITICAL OUTPUT RULES (MANDATORY):
   "tenth_percent": Number,
   "backlogs": Number,
 
-  "experience": Number,
+  "experienceYears": Number,
   "experience_level": "Entry-Level" | "Mid-Level" | "Senior-Level",
   "desired_role": String,
   "communication_rating": Number,
@@ -162,7 +162,7 @@ Hackathon Participation: Yes"
   "twelfth_percent": 89,
   "tenth_percent": 92,
   "backlogs": 0,
-  "experience": 1,
+  "experienceYears": 1,
   "experience_level": "Entry-Level",
   "desired_role": "Full Stack Developer",
   "communication_rating": null,

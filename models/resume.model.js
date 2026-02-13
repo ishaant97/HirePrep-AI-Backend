@@ -71,8 +71,8 @@ const resumeSchema = new mongoose.Schema(
             type: String,
             trim: true
         },
-        experience: {
-            type: Number, // count of internships/jobs
+        experience_years: {
+            type: Number,
             default: 0
         },
         experience_level: {
