@@ -17,6 +17,10 @@ const resumeSchema = new mongoose.Schema(
             required: true,
             trim: true
         },
+        resumeExtractedText: {
+            type: String,
+            trim: true
+        },
         name: {
             type: String,
             required: true,
@@ -63,6 +67,10 @@ const resumeSchema = new mongoose.Schema(
             min: 0
         },
         // Professional details
+        desired_role: {
+            type: String,
+            trim: true
+        },
         experience: {
             type: Number, // count of internships/jobs
             default: 0

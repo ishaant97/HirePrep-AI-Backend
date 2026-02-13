@@ -223,4 +223,168 @@ ${resumeText}`;
     }
 }
 
-module.exports = { getGeminiResponse, geminiExtractedInfoOfResume };
+const geminiATSResponseForResume = async (resumeData, desiredRole) => {
+    const prompt = `
+    You are an enterprise-grade Applicant Tracking System (ATS) resume evaluation engine.
+
+Your task is to evaluate the resume quality and role alignment strictly based on ATS standards used by modern recruiters.
+
+You must behave like a deterministic scoring system, NOT a career coach.
+
+The candidate has specified a desired job role.
+You must evaluate how well the resume aligns with that role.
+
+========================================
+INPUTS PROVIDED:
+========================================
+1) Desired Role
+2) Resume Text
+
+You MUST use both inputs when scoring.
+
+========================================
+SCORING CRITERIA (Total = 100 Points)
+========================================
+
+1) Section Completeness (10 points)
+- Detect presence of:
+  - Professional Summary / Objective
+  - Education
+  - Skills
+  - Experience
+  - Projects
+  - Certifications
+- Deduct points for missing major sections.
+
+2) Contact & Professional Links (5 points)
+- Email present
+- Phone present
+- LinkedIn present
+- Deduct if missing or poorly formatted.
+
+3) Chronological Structure (10 points)
+- Experience and education should follow reverse chronological order.
+- Deduct for inconsistent date formats.
+- Deduct if dates are unclear or missing.
+
+4) Experience Quality (15 points)
+- Clear role descriptions.
+- Bullet-point clarity.
+- Impact-focused descriptions.
+- Penalize vague responsibilities.
+
+5) Quantified Achievements (10 points)
+- Reward usage of numbers, %, metrics, measurable impact.
+- Penalize if no measurable achievements are present.
+
+6) Action Verbs Strength (10 points)
+- Reward strong action verbs (Developed, Implemented, Led, Designed, Optimized, Built, Created, Engineered).
+- Penalize repeated weak verbs.
+- Penalize passive language.
+
+7) Skills Depth & Technical Strength (10 points)
+- Skills clearly listed.
+- Technical skills grouped properly.
+- Penalize overly generic skills.
+
+8) Readability & Formatting (10 points)
+- Clear structure.
+- Logical spacing.
+- Consistent bullet usage.
+- Professional tone.
+
+9) Education Quality (5 points)
+- CGPA/Percentage clarity.
+- Academic consistency.
+- Penalize missing details.
+
+10) Role Alignment Score (15 points)
+- Evaluate how well skills, projects, and experience match the Desired Role.
+- Reward relevant technical stack.
+- Penalize irrelevant content.
+- Penalize missing core competencies expected for that role.
+- Consider industry-standard skills for that role.
+
+========================================
+CRITICAL RULES
+========================================
+
+- Total score MUST be between 0 and 100.
+- Do NOT hallucinate missing sections.
+- Use ONLY the provided resume text.
+- Be strict but fair.
+- Do NOT inflate scores.
+- Do NOT explain scoring methodology.
+- Return STRICT JSON ONLY.
+- No markdown.
+- No extra commentary.
+
+========================================
+OUTPUT FORMAT (STRICT JSON)
+========================================
+
+{
+  "ats_score": number,
+  "breakdown": {
+    "section_completeness": number,
+    "contact_score": number,
+    "chronology_score": number,
+    "experience_quality": number,
+    "quantification_score": number,
+    "action_verbs_score": number,
+    "skills_score": number,
+    "readability_score": number,
+    "education_score": number,
+    "role_alignment_score": number
+  },
+  "role_analysis": {
+    "desired_role": "string",
+    "role_match_level": "Poor | Moderate | Strong",
+  },
+  "strengths": ["string"],
+  "weaknesses": ["string"],
+  "improvement_suggestions": ["string"]
+}
+
+========================================
+INPUT DATA
+========================================
+
+Desired Role:
+${desiredRole}
+
+Resume Text:
+${resumeData}
+`;
+
+    try {
+        const model = genAI.getGenerativeModel({
+            model: "gemma-3-27b-it"
+        });
+
+        const result = await model.generateContent(prompt);
+        const responseText = result.response.text();
+
+        // 1. Clean markdown code fences
+        let cleaned = responseText
+            .replace(/```json/gi, "")
+            .replace(/```/g, "")
+            .trim();
+
+        // 2. Extract JSON safely (in case extra text sneaks in)
+        const match = cleaned.match(/\{[\s\S]*\}/);
+
+        if (!match) {
+            console.error("AI Response (no JSON found):", responseText);
+            throw new Error("No JSON object found in AI response");
+        }
+
+        return JSON.parse(match[0]);
+    } catch (error) {
+        console.error("Error generating ATS evaluation:", error);
+        throw new Error(`Failed to generate ATS evaluation: ${error.message}`);
+    }
+}
+
+
+module.exports = { getGeminiResponse, geminiExtractedInfoOfResume, geminiATSResponseForResume };

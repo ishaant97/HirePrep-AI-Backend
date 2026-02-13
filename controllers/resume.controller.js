@@ -23,6 +23,8 @@ async function saveResume(req, res) {
             return res.status(400).json({ error: "No resume file uploaded" });
         }
 
+        const extractedText = await parseResumePDF(req.file.buffer);
+
         const uploadResult = await uploadPdfBuffer(
             req.file.buffer,
             req.file.originalname
@@ -43,6 +45,7 @@ async function saveResume(req, res) {
             ...resumeData,
             originalFileName: req.file.originalname,
             resumePdfUrl: uploadResult.secure_url,
+            resumeExtractedText: extractedText,
         });
 
         await resume.save();
