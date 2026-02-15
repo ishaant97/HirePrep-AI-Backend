@@ -109,4 +109,14 @@ async function viewResume(req, res) {
     }
 }
 
-module.exports = { saveResume, parseResumeText, viewResume };
+async function getResumesByUserId(req, res) {
+    try {
+        const resumes = await Resume.find({ userId: req.params.userId })
+            .select("originalFileName resumePdfUrl");
+        res.json(resumes);
+    } catch (error) {
+        res.status(500).json({ error: "Failed to fetch resumes, " + error.message });
+    }
+}
+
+module.exports = { saveResume, parseResumeText, viewResume, getResumesByUserId };
