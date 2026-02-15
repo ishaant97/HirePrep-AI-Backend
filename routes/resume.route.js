@@ -9,6 +9,6 @@ const upload = multer();
 router.post("/save", protect, upload.single('resume'), saveResume)
 router.post("/parseResume", protect, upload.single('resume'), parseResumeText)
 router.get("/view/:id", protect, viewResume)
-router.get("/:userId", protect, getResumesByUserId);
+router.get("/user/:userId", protect, getResumesByUserId);
 
 module.exports = router;
