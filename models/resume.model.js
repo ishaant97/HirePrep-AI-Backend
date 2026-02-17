@@ -109,9 +109,12 @@ const resumeSchema = new mongoose.Schema(
             trim: true
         },
         internships: [{
-            company: { type: String, required: true },
-            role: { type: String, required: true }
+            company: { type: String },
+            role: { type: String }
         }],
+
+        // Analytics
+
     },
     { timestamps: true }
 );
