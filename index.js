@@ -23,6 +23,10 @@ app.use(cors({
     credentials: true
 }));
 
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok' });
+});
+
 app.use('/api/auth', authRoutes);
 app.use('/api/gemini', geminiRoutes);
 app.use('/api/resume', resumeRoutes);
