@@ -13,9 +13,14 @@ const app = express();
 
 app.use(cookieParser());
 app.use(express.json());
+const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
 app.use(cors({
-    origin: 'http://localhost:5173', // Frontend URL from which requests will be accepted
-    credentials: true                // Required if you are sending cookies/sessions
+    origin: allowedOrigins,
+    credentials: true
 }));
 
 app.use('/api/auth', authRoutes);
