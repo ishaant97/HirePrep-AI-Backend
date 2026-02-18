@@ -11,24 +11,29 @@ async function register(req, res) {
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await User.create({ name, collegeName, email, password: hashedPassword });
     const token = generateToken(user._id, user.email);
-    const isProduction = process.env.NODE_ENV === "production";
-    const corsOrigins = (process.env.CORS_ORIGIN || "")
-        .split(",")
-        .map((origin) => origin.trim())
-        .filter(Boolean);
-    const isLocalhostOrigin = corsOrigins.some((origin) => origin.includes("localhost"));
-    const shouldUseSecure = isProduction && !isLocalhostOrigin;
+    // const isProduction = process.env.NODE_ENV === "production";
+    // const corsOrigins = (process.env.CORS_ORIGIN || "")
+    //     .split(",")
+    //     .map((origin) => origin.trim())
+    //     .filter(Boolean);
+    // const isLocalhostOrigin = corsOrigins.some((origin) => origin.includes("localhost"));
+    // const shouldUseSecure = isProduction && !isLocalhostOrigin;
     res
         .cookie("token", token, {
             httpOnly: true,
-            secure: shouldUseSecure,
-            sameSite: shouldUseSecure ? "none" : "lax",
+            secure: true,
+            sameSite: "none",
             maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
         })
         .status(201)
         .json({
             message: 'User registered successfully',
-            user: { id: user._id, name: user.name, collegeName: user.collegeName, email: user.email }
+            user: {
+                id: user._id,
+                name: user.name,
+                collegeName: user.collegeName,
+                email: user.email
+            }
         });
 }
 
@@ -43,19 +48,19 @@ async function login(req, res) {
         return res.status(401).json({ message: "Invalid credentials" });
     }
     const token = generateToken(user._id, user.email);
-    const isProduction = process.env.NODE_ENV === "production";
-    const corsOrigins = (process.env.CORS_ORIGIN || "")
-        .split(",")
-        .map((origin) => origin.trim())
-        .filter(Boolean);
-    const isLocalhostOrigin = corsOrigins.some((origin) => origin.includes("localhost"));
-    const shouldUseSecure = isProduction && !isLocalhostOrigin;
+    // const isProduction = process.env.NODE_ENV === "production";
+    // const corsOrigins = (process.env.CORS_ORIGIN || "")
+    //     .split(",")
+    //     .map((origin) => origin.trim())
+    //     .filter(Boolean);
+    // const isLocalhostOrigin = corsOrigins.some((origin) => origin.includes("localhost"));
+    // const shouldUseSecure = isProduction && !isLocalhostOrigin;
     res
         .cookie("token", token, {
             httpOnly: true,
-            secure: shouldUseSecure,
-            sameSite: shouldUseSecure ? "none" : "lax",
-            maxAge: 7 * 24 * 60 * 60 * 1000
+            secure: true,
+            sameSite: "none",
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
         })
         .json({
             message: "Login successful",
@@ -69,19 +74,19 @@ async function login(req, res) {
 }
 
 function logout(req, res) {
-    const isProduction = process.env.NODE_ENV === "production";
-    const corsOrigins = (process.env.CORS_ORIGIN || "")
-        .split(",")
-        .map((origin) => origin.trim())
-        .filter(Boolean);
-    const isLocalhostOrigin = corsOrigins.some((origin) => origin.includes("localhost"));
-    const shouldUseSecure = isProduction && !isLocalhostOrigin;
+    // const isProduction = process.env.NODE_ENV === "production";
+    // const corsOrigins = (process.env.CORS_ORIGIN || "")
+    //     .split(",")
+    //     .map((origin) => origin.trim())
+    //     .filter(Boolean);
+    // const isLocalhostOrigin = corsOrigins.some((origin) => origin.includes("localhost"));
+    // const shouldUseSecure = isProduction && !isLocalhostOrigin;
     res
         .cookie("token", "", {
             httpOnly: true,
-            secure: shouldUseSecure,
-            sameSite: shouldUseSecure ? "none" : "lax",
-            maxAge: 0
+            secure: true,
+            sameSite: "none",
+            maxAge: 0 // Expire the cookie immediately
         })
         .json({ message: "Logout successful" });
 }
