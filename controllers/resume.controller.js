@@ -1,6 +1,6 @@
 const Resume = require("../models/resume.model");
 const { parseResumeText: parseResumePDF } = require("../utils/parseResume");
-const { geminiExtractedInfoOfResume } = require("../utils/geminiServices");
+const { geminiExtractedInfoOfResume, geminiATSResponseForResume } = require("../utils/geminiServices");
 const { uploadPdfBuffer } = require("../utils/cloudinary");
 const http = require("http");
 const https = require("https");
@@ -49,6 +49,18 @@ async function saveResume(req, res) {
         });
 
         await resume.save();
+
+        // Automatically run ATS evaluation in the background
+        const desiredRole = resumeData.desired_role || "";
+        if (extractedText && desiredRole) {
+            try {
+                const atsResult = await geminiATSResponseForResume(extractedText, desiredRole);
+                resume.analytics = { ats_evaluation: atsResult };
+                await resume.save();
+            } catch (atsError) {
+                console.error("ATS evaluation failed (resume still saved):", atsError.message);
+            }
+        }
 
         res.status(201).json({
             success: true,

@@ -115,6 +115,30 @@ const resumeSchema = new mongoose.Schema(
 
         // Analytics
 
+        analytics: {
+            ats_evaluation: {
+                ats_score: { type: Number, min: 0, max: 100 },
+                breakdown: {
+                    section_completeness: { type: Number, min: 0, max: 10 },
+                    contact_score: { type: Number, min: 0, max: 5 },
+                    chronology_score: { type: Number, min: 0, max: 10 },
+                    experience_quality: { type: Number, min: 0, max: 15 },
+                    quantification_score: { type: Number, min: 0, max: 10 },
+                    action_verbs_score: { type: Number, min: 0, max: 10 },
+                    skills_score: { type: Number, min: 0, max: 10 },
+                    readability_score: { type: Number, min: 0, max: 10 },
+                    education_score: { type: Number, min: 0, max: 5 },
+                    role_alignment_score: { type: Number, min: 0, max: 15 }
+                },
+                role_analysis: {
+                    desired_role: { type: String },
+                    role_match_level: { type: String }
+                },
+                strengths: [{ type: String }],
+                weaknesses: [{ type: String }],
+                improvement_suggestions: [{ type: String }]
+            }
+        },
     },
     { timestamps: true }
 );
