@@ -137,6 +137,32 @@ const resumeSchema = new mongoose.Schema(
                 strengths: [{ type: String }],
                 weaknesses: [{ type: String }],
                 improvement_suggestions: [{ type: String }]
+            },
+            career_roadmap: {
+                career_stage_assessment: { type: String },
+                roadmap: {
+                    short_term_0_3_months: {
+                        technical_skills_to_focus: [{ type: String }],
+                        projects_to_build_or_improve: [{ type: String }],
+                        resume_optimization_steps: [{ type: String }],
+                        interview_preparation_strategy: [{ type: String }],
+                        profile_building_strategy: [{ type: String }]
+                    },
+
+                    mid_term_3_6_months: {
+                        advanced_skills_to_develop: [{ type: String }],
+                        high_impact_projects: [{ type: String }],
+                        certifications_or_specializations: [{ type: String }],
+                        internship_or_experience_strategy: [{ type: String }]
+                    },
+
+                    long_term_6_12_months: {
+                        specialization_direction: [{ type: String }],
+                        portfolio_strengthening: [{ type: String }],
+                        placement_strategy: [{ type: String }]
+                    }
+                },
+                priority_actions_ranked: [{ type: String }]
             }
         },
     },

@@ -3,6 +3,16 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 // Initialize the API client
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+// Helper to fix common JSON issues from LLM output
+function sanitizeLLMJson(jsonStr) {
+    // Replace single-quoted keys/values with double quotes
+    jsonStr = jsonStr.replace(/(?<=[{,\[\s])\s*'([^']+)'\s*:/g, '"$1":');
+    jsonStr = jsonStr.replace(/:\s*'([^']*)'/g, ': "$1"');
+    // Remove trailing commas before } or ]
+    jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1');
+    return JSON.parse(jsonStr);
+}
+
 const getGeminiResponse = async (req, res) => {
     try {
         // 1. Get the prompt from the request body
@@ -204,8 +214,8 @@ ${resumeText}`;
             throw new Error("No JSON object found in AI response");
         }
 
-        // 3. Parse JSON
-        const parsed = JSON.parse(match[0]);
+        // 3. Parse JSON (with LLM output sanitization)
+        const parsed = sanitizeLLMJson(match[0]);
 
         // 4. Validate required fields exist
         if (!parsed.name && !parsed.email && !parsed.skills) {
@@ -337,7 +347,7 @@ OUTPUT FORMAT (STRICT JSON)
   },
   "role_analysis": {
     "desired_role": "string",
-    "role_match_level": "Poor | Moderate | Strong",
+    "role_match_level": "Poor | Moderate | Strong"
   },
   "strengths": ["string"],
   "weaknesses": ["string"],
@@ -377,12 +387,125 @@ ${resumeData}
             throw new Error("No JSON object found in AI response");
         }
 
-        return JSON.parse(match[0]);
+        return sanitizeLLMJson(match[0]);
     } catch (error) {
         console.error("Error generating ATS evaluation:", error);
         throw new Error(`Failed to generate ATS evaluation: ${error.message}`);
     }
 }
 
+const geminiCareerRoadmapForResume = async (extractedText, desiredRole, experience_years, cgpa, backlogs, communication_rating, hackathons_participated, skills, projects, certifications, internships, atsResult) => {
+    const prompt = `
+    You are an expert Career Strategist, ATS Optimization Specialist, and Campus Placement Mentor.
 
-module.exports = { getGeminiResponse, geminiExtractedInfoOfResume, geminiATSResponseForResume };
+Your task is to generate a highly personalized, actionable career roadmap for a student based strictly on their resume data and ATS evaluation.
+
+Goals:
+- Increase ATS score
+- Strengthen alignment with the student's desired role
+- Improve resume competitiveness
+- Improve placement readiness
+
+Important Instructions:
+- Align all recommendations strictly with the student's Desired Role.
+- Do NOT include vague advice.
+- Every suggestion must be specific and actionable.
+- Be realistic based on experience level.
+- Return ONLY structured JSON.
+- Do not include explanations outside JSON.
+
+--------------------------------------------------
+STUDENT DATA:
+
+Desired Role: ${desiredRole}
+Experience Years: ${experience_years}
+CGPA: ${cgpa}
+Backlogs: ${backlogs}
+Communication Rating (1-5): ${communication_rating}
+Hackathon Participation: ${hackathons_participated}
+
+Skills:
+${skills}
+
+Projects:
+${projects}
+
+Internships:
+${internships}
+
+Certifications:
+${certifications}
+
+--------------------------------------------------
+ATS ANALYSIS:
+
+Current ATS Evaluation: ${atsResult}
+
+This ATS evaluation contains a detailed breakdown of the resume's strengths and weaknesses, as well as an analysis of how well the resume aligns with the desired role. Use this information to generate your recommendations in the career roadmap.
+
+--------------------------------------------------
+
+Now generate a structured career roadmap in the following JSON format:
+
+{
+  "career_stage_assessment": "",
+  "roadmap": {
+    "short_term_0_3_months": {
+      "technical_skills_to_focus": [],
+      "projects_to_build_or_improve": [],
+      "resume_optimization_steps": [],
+      "interview_preparation_strategy": [],
+      "profile_building_strategy": []
+    },
+    "mid_term_3_6_months": {
+      "advanced_skills_to_develop": [],
+      "high_impact_projects": [],
+      "certifications_or_specializations": [],
+      "internship_or_experience_strategy": []
+    },
+    "long_term_6_12_months": {
+      "specialization_direction": [],
+      "portfolio_strengthening": [],
+      "placement_strategy": []
+    }
+  },
+  "priority_actions_ranked": [],
+}
+
+Rules:
+- Recommendations must directly address weaknesses and skill gaps.
+- Roadmap must be progressive and logically structured.
+- Avoid repeating strengths unless relevant for leverage.
+- Keep content concise but impactful.
+    `;
+
+    try {
+        const model = genAI.getGenerativeModel({
+            model: "gemma-3-12b-it"
+        });
+
+        const result = await model.generateContent(prompt);
+        const responseText = result.response.text();
+
+        // 1. Clean markdown code fences
+        let cleaned = responseText
+            .replace(/```json/gi, "")
+            .replace(/```/g, "")
+            .trim();
+
+        // 2. Extract JSON safely (in case extra text sneaks in)
+        const match = cleaned.match(/\{[\s\S]*\}/);
+
+        if (!match) {
+            console.error("AI Response (no JSON found):", responseText);
+            throw new Error("No JSON object found in AI response");
+        }
+
+        return sanitizeLLMJson(match[0]);
+    } catch (error) {
+        console.error("Error generating career roadmap:", error);
+        throw new Error(`Failed to generate career roadmap: ${error.message}`);
+    }
+}
+
+module.exports = { getGeminiResponse, geminiExtractedInfoOfResume, geminiATSResponseForResume, geminiCareerRoadmapForResume };

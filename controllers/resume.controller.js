@@ -1,6 +1,6 @@
 const Resume = require("../models/resume.model");
 const { parseResumeText: parseResumePDF } = require("../utils/parseResume");
-const { geminiExtractedInfoOfResume, geminiATSResponseForResume } = require("../utils/geminiServices");
+const { geminiExtractedInfoOfResume, geminiATSResponseForResume, geminiCareerRoadmapForResume } = require("../utils/geminiServices");
 const { uploadPdfBuffer } = require("../utils/cloudinary");
 const http = require("http");
 const https = require("https");
@@ -48,19 +48,52 @@ async function saveResume(req, res) {
             resumeExtractedText: extractedText,
         });
 
-        await resume.save();
+        // await resume.save();
 
-        // Automatically run ATS evaluation in the background
         const desiredRole = resumeData.desired_role || "";
+        const experience_years = resumeData.experience_years || 0;
+        const cgpa = resumeData.cgpa || 0;
+        const backlogs = resumeData.backlogs || 0;
+        const communication_rating = resumeData.communication_rating || 0;
+        const hackathons_participated = resumeData.hackathon || 0;
+        const skills = resumeData.skills || [];
+        const projects = resumeData.project || [];
+        const certifications = resumeData.certifications || [];
+        const internships = resumeData.internships || [];
+
+        // Build analytics as a plain object, then assign once to avoid
+        // Mongoose subdocument spread issues that cause "Cast to Object" errors.
+        const analytics = {};
+        let atsResult = null;
+
         if (extractedText && desiredRole) {
             try {
-                const atsResult = await geminiATSResponseForResume(extractedText, desiredRole);
-                resume.analytics = { ats_evaluation: atsResult };
-                await resume.save();
+                atsResult = await geminiATSResponseForResume(extractedText, desiredRole);
+                if (atsResult && typeof atsResult === "object") {
+                    analytics.ats_evaluation = atsResult;
+                }
             } catch (atsError) {
                 console.error("ATS evaluation failed (resume still saved):", atsError.message);
             }
         }
+
+        if (atsResult && extractedText) {
+            try {
+                const roadMap = await geminiCareerRoadmapForResume(extractedText, desiredRole, experience_years, cgpa, backlogs, communication_rating, hackathons_participated, skills, projects, certifications, internships, atsResult);
+                if (roadMap && typeof roadMap === "object") {
+                    analytics.career_roadmap = roadMap;
+                }
+            } catch (roadmapError) {
+                console.error("Career roadmap generation failed (resume still saved):", roadmapError.message);
+            }
+        }
+
+        if (Object.keys(analytics).length > 0) {
+            resume.analytics = analytics;
+            resume.markModified("analytics");
+        }
+
+        await resume.save();
 
         res.status(201).json({
             success: true,
