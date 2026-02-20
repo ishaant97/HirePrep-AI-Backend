@@ -131,4 +131,18 @@ async function getResumesByUserId(req, res) {
     }
 }
 
-module.exports = { saveResume, parseResumeText, viewResume, getResumesByUserId };
+async function getResumeAnalytics(req, res) {
+    try {
+        const resume = await Resume.findOne({ _id: req.params.id, userId: req.user._id });
+
+        if (!resume) {
+            return res.status(404).json({ error: "Resume not found" });
+        }
+
+        res.json(resume.analytics || {});
+    } catch (error) {
+        res.status(500).json({ error: "Failed to fetch resume analytics, " + error.message });
+    }
+}
+
+module.exports = { saveResume, parseResumeText, viewResume, getResumesByUserId, getResumeAnalytics };

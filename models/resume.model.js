@@ -75,11 +75,11 @@ const resumeSchema = new mongoose.Schema(
             type: Number,
             default: 0
         },
-        experience_level: {
-            type: String,
-            enum: ['Entry-Level', 'Mid-Level', 'Senior-Level'],
-            default: 'Entry-Level'
-        },
+        // experience_level: {
+        //     type: String,
+        //     enum: ['Entry-Level', 'Mid-Level', 'Senior-Level'],
+        //     default: 'Entry-Level'
+        // },
         desired_role: {
             type: String,
             trim: true

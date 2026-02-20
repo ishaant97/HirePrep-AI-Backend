@@ -51,7 +51,7 @@ Your task is to extract structured information from raw resume text and return t
    - null for single-value fields
    - [] for arrays
    - default values where logically applicable
-4. Infer values intelligently when possible (e.g., experience_level based on experience count).
+4. Infer values intelligently when possible.
 5. Normalize data (trim strings, remove unnecessary symbols).
 6. Skills, projects, and certifications must be arrays of strings.
 7. internships must be an array of objects with { company, role }.
@@ -106,7 +106,6 @@ CRITICAL OUTPUT RULES (MANDATORY):
   "backlogs": Number,
 
   "experienceYears": Number,
-  "experience_level": "Entry-Level" | "Mid-Level" | "Senior-Level",
   "desired_role": String,
   "communication_rating": Number,
 
@@ -163,7 +162,6 @@ Hackathon Participation: Yes"
   "tenth_percent": 92,
   "backlogs": 0,
   "experienceYears": 1,
-  "experience_level": "Entry-Level",
   "desired_role": "Full Stack Developer",
   "communication_rating": null,
   "skills": ["JavaScript", "React", "Node.js", "MongoDB"],
