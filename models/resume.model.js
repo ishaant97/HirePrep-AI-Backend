@@ -139,7 +139,11 @@ const resumeSchema = new mongoose.Schema(
                 improvement_suggestions: [{ type: String }]
             },
             career_roadmap: {
-                career_stage_assessment: { type: String },
+                career_profile_summary: {
+                    current_positioning: { type: String },
+                    role_alignment_score_estimate: { type: Number, min: 0, max: 100 },
+                    key_gap_themes: [{ type: String }]
+                },
                 roadmap: {
                     short_term_0_3_months: {
                         technical_skills_to_focus: [{ type: String }],
@@ -162,7 +166,12 @@ const resumeSchema = new mongoose.Schema(
                         placement_strategy: [{ type: String }]
                     }
                 },
-                priority_actions_ranked: [{ type: String }]
+                priority_actions_ranked: [{ type: String }],
+                impact_projection: {
+                    resume_strength_improvement: { type: String },
+                    profile_competitiveness_boost: { type: String },
+                    expected_outcome_if_followed: { type: String }
+                }
             }
         },
     },

@@ -194,7 +194,7 @@ ${resumeText}`;
 
     try {
         const model = genAI.getGenerativeModel({
-            model: "gemma-3-27b-it"
+            model: "gemma-3-4b-it"
         });
 
         const result = await model.generateContent(prompt);
@@ -400,29 +400,39 @@ const geminiCareerRoadmapForResume = async (extractedText, desiredRole, experien
 
 Your task is to generate a highly personalized, actionable career roadmap for a student based strictly on their resume data and ATS evaluation.
 
-Goals:
+Your objectives:
 - Increase ATS score
-- Strengthen alignment with the student's desired role
-- Improve resume competitiveness
+- Improve alignment with the desired role
+- Strengthen resume competitiveness
 - Improve placement readiness
 
-Important Instructions:
-- Align all recommendations strictly with the student's Desired Role.
-- Do NOT include vague advice.
-- Every suggestion must be specific and actionable.
-- Be realistic based on experience level.
+CRITICAL STYLE RULES:
+- Do NOT use the student's name anywhere in the response.
+- Do NOT use second-person language (avoid words like "you", "your").
+- Do NOT use third-person references like "the candidate".
+- Use a neutral, professional, dashboard-ready tone.
+- Keep language analytical and structured.
+- Avoid motivational or narrative storytelling style.
+
+Important Functional Rules:
+- Align ALL recommendations strictly with the student's Desired Role.
+- Use ATS evaluation insights directly to address weaknesses and gaps.
+- Use the extracted resume text for contextual understanding.
+- Do NOT provide generic advice.
+- Every recommendation must be specific, measurable, and actionable.
+- Be realistic based on the student’s experience level.
 - Return ONLY structured JSON.
 - Do not include explanations outside JSON.
 
 --------------------------------------------------
-STUDENT DATA:
+STUDENT CORE DATA:
 
 Desired Role: ${desiredRole}
 Experience Years: ${experience_years}
 CGPA: ${cgpa}
 Backlogs: ${backlogs}
 Communication Rating (1-5): ${communication_rating}
-Hackathon Participation: ${hackathons_participated}
+Hackathons Participated: ${hackathons_participated}
 
 Skills:
 ${skills}
@@ -437,18 +447,25 @@ Certifications:
 ${certifications}
 
 --------------------------------------------------
-ATS ANALYSIS:
+FULL RESUME CONTENT:
+${extractedText}
 
-Current ATS Evaluation: ${atsResult}
+--------------------------------------------------
+ATS EVALUATION RESULT:
+${atsResult}
 
-This ATS evaluation contains a detailed breakdown of the resume's strengths and weaknesses, as well as an analysis of how well the resume aligns with the desired role. Use this information to generate your recommendations in the career roadmap.
+This ATS evaluation contains strengths, weaknesses, keyword gaps, and role alignment analysis. Use it directly to inform roadmap recommendations.
 
 --------------------------------------------------
 
-Now generate a structured career roadmap in the following JSON format:
+Generate the response strictly in the following JSON format:
 
 {
-  "career_stage_assessment": "",
+  "career_profile_summary": {
+    "current_positioning": "",
+    "role_alignment_score_estimate": 0,
+    "key_gap_themes": []
+  },
   "roadmap": {
     "short_term_0_3_months": {
       "technical_skills_to_focus": [],
@@ -470,13 +487,19 @@ Now generate a structured career roadmap in the following JSON format:
     }
   },
   "priority_actions_ranked": [],
+  "impact_projection": {
+    "resume_strength_improvement": "",
+    "profile_competitiveness_boost": "",
+    "expected_outcome_if_followed": ""
+  }
 }
 
-Rules:
-- Recommendations must directly address weaknesses and skill gaps.
-- Roadmap must be progressive and logically structured.
-- Avoid repeating strengths unless relevant for leverage.
-- Keep content concise but impactful.
+Additional Constraints:
+- role_alignment_score_estimate must be between 0 and 100.
+- priority_actions_ranked must include only 3–5 highest-impact actions.
+- Recommendations must clearly connect to weaknesses in atsResult.
+- Avoid repeating strengths unless strategically leveraged.
+- Keep suggestions concise, structured, and implementation-focused.
     `;
 
     try {
