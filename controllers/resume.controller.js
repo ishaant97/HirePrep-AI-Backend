@@ -23,12 +23,11 @@ async function saveResume(req, res) {
             return res.status(400).json({ error: "No resume file uploaded" });
         }
 
-        const extractedText = await parseResumePDF(req.file.buffer);
-
-        const uploadResult = await uploadPdfBuffer(
-            req.file.buffer,
-            req.file.originalname
-        );
+        // ── Optimization 1: Parallelize PDF parsing + Cloudinary upload ──
+        const [extractedText, uploadResult] = await Promise.all([
+            parseResumePDF(req.file.buffer),
+            uploadPdfBuffer(req.file.buffer, req.file.originalname),
+        ]);
 
         const resumeData = req.body.resumeData
             ? tryParseJson(req.body.resumeData)
@@ -46,9 +45,38 @@ async function saveResume(req, res) {
             originalFileName: req.file.originalname,
             resumePdfUrl: uploadResult.secure_url,
             resumeExtractedText: extractedText,
+            analyticsStatus: "pending",
         });
 
-        // await resume.save();
+        // ── Optimization 2: Save immediately & respond fast ──
+        await resume.save();
+
+        res.status(201).json({
+            success: true,
+            message: "Resume saved successfully. Analytics are being generated.",
+            resumeId: resume._id,
+            analyticsStatus: "pending",
+        });
+
+        // ── Optimization 3: Process analytics in the background ──
+        // (response already sent — this runs asynchronously)
+        processAnalyticsInBackground(resume, resumeData, extractedText).catch(
+            (err) => console.error("Background analytics processing failed:", err.message)
+        );
+    } catch (error) {
+        res.status(500).json({ message: "Failed to save resume, " + error.message });
+    }
+}
+
+/**
+ * Runs after the response is sent. Generates ATS evaluation + career roadmap
+ * and patches the saved resume document.
+ */
+async function processAnalyticsInBackground(resume, resumeData, extractedText) {
+    const resumeId = resume._id;
+
+    try {
+        await Resume.updateOne({ _id: resumeId }, { analyticsStatus: "processing" });
 
         const desiredRole = resumeData.desired_role || "";
         const experience_years = resumeData.experience_years || 0;
@@ -61,11 +89,10 @@ async function saveResume(req, res) {
         const certifications = resumeData.certifications || [];
         const internships = resumeData.internships || [];
 
-        // Build analytics as a plain object, then assign once to avoid
-        // Mongoose subdocument spread issues that cause "Cast to Object" errors.
         const analytics = {};
         let atsResult = null;
 
+        // Step 1: ATS Evaluation
         if (extractedText && desiredRole) {
             try {
                 atsResult = await geminiATSResponseForResume(extractedText, desiredRole);
@@ -73,35 +100,40 @@ async function saveResume(req, res) {
                     analytics.ats_evaluation = atsResult;
                 }
             } catch (atsError) {
-                console.error("ATS evaluation failed (resume still saved):", atsError.message);
+                console.error("ATS evaluation failed:", atsError.message);
             }
         }
 
+        // Step 2: Career Roadmap (depends on ATS result)
         if (atsResult && extractedText) {
             try {
-                const roadMap = await geminiCareerRoadmapForResume(extractedText, desiredRole, experience_years, cgpa, backlogs, communication_rating, hackathons_participated, skills, projects, certifications, internships, atsResult);
+                const roadMap = await geminiCareerRoadmapForResume(
+                    extractedText, desiredRole, experience_years, cgpa,
+                    backlogs, communication_rating, hackathons_participated,
+                    skills, projects, certifications, internships, atsResult
+                );
                 if (roadMap && typeof roadMap === "object") {
                     analytics.career_roadmap = roadMap;
                 }
             } catch (roadmapError) {
-                console.error("Career roadmap generation failed (resume still saved):", roadmapError.message);
+                console.error("Career roadmap generation failed:", roadmapError.message);
             }
         }
 
+        // Step 3: Patch the resume with analytics
+        const updateFields = { analyticsStatus: "completed" };
         if (Object.keys(analytics).length > 0) {
-            resume.analytics = analytics;
-            resume.markModified("analytics");
+            updateFields.analytics = analytics;
         }
 
-        await resume.save();
-
-        res.status(201).json({
-            success: true,
-            message: "Resume saved successfully",
-        });
+        await Resume.updateOne({ _id: resumeId }, { $set: updateFields });
+        console.log(`Analytics completed for resume ${resumeId}`);
     } catch (error) {
-        // console.error(error);
-        res.status(500).json({ message: "Failed to save resume, " + error.message });
+        console.error(`Analytics processing error for resume ${resumeId}:`, error.message);
+        await Resume.updateOne(
+            { _id: resumeId },
+            { analyticsStatus: "failed" }
+        ).catch(() => { });
     }
 }
 
@@ -166,13 +198,17 @@ async function getResumesByUserId(req, res) {
 
 async function getResumeAnalytics(req, res) {
     try {
-        const resume = await Resume.findOne({ _id: req.params.id, userId: req.user._id });
+        const resume = await Resume.findOne({ _id: req.params.id, userId: req.user._id })
+            .select("analytics analyticsStatus");
 
         if (!resume) {
             return res.status(404).json({ error: "Resume not found" });
         }
 
-        res.json(resume.analytics || {});
+        res.json({
+            analyticsStatus: resume.analyticsStatus || "pending",
+            analytics: resume.analytics || {},
+        });
     } catch (error) {
         res.status(500).json({ error: "Failed to fetch resume analytics, " + error.message });
     }

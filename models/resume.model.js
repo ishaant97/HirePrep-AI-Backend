@@ -113,6 +113,13 @@ const resumeSchema = new mongoose.Schema(
             role: { type: String }
         }],
 
+        // Analytics processing status: pending | processing | completed | failed
+        analyticsStatus: {
+            type: String,
+            enum: ["pending", "processing", "completed", "failed"],
+            default: "pending",
+        },
+
         // Analytics
 
         analytics: {
