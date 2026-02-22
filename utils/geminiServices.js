@@ -3,14 +3,107 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 // Initialize the API client
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Helper to fix common JSON issues from LLM output
+/**
+ * Walk through a JSON string character-by-character and fix:
+ *  - Unescaped double quotes inside string values
+ *  - Raw newlines / carriage returns / tabs inside strings
+ *  - Other control characters (U+0000 – U+001F)
+ */
+function fixJsonStringValues(str) {
+    let result = '';
+    let i = 0;
+    let inString = false;
+
+    while (i < str.length) {
+        const char = str[i];
+
+        if (!inString) {
+            result += char;
+            if (char === '"') inString = true;
+            i++;
+        } else {
+            // Inside a JSON string value
+            if (char === '\\') {
+                // Escaped character – keep escape + next char as-is
+                result += char;
+                i++;
+                if (i < str.length) {
+                    result += str[i];
+                    i++;
+                }
+            } else if (char === '"') {
+                // Is this the real closing quote, or an unescaped internal quote?
+                // Look ahead past whitespace for the next meaningful character.
+                let j = i + 1;
+                while (j < str.length && /\s/.test(str[j])) j++;
+                const next = j < str.length ? str[j] : '';
+
+                if (
+                    next === ',' ||
+                    next === '}' ||
+                    next === ']' ||
+                    next === ':' ||
+                    next === '"' ||
+                    next === ''
+                ) {
+                    // Genuine closing quote
+                    inString = false;
+                    result += char;
+                } else {
+                    // Internal quote – escape it
+                    result += '\\"';
+                }
+                i++;
+            } else if (char === '\n') {
+                result += '\\n';
+                i++;
+            } else if (char === '\r') {
+                result += '\\r';
+                i++;
+            } else if (char === '\t') {
+                result += '\\t';
+                i++;
+            } else if (char.charCodeAt(0) < 0x20) {
+                // Other control characters
+                result += '\\u' + char.charCodeAt(0).toString(16).padStart(4, '0');
+                i++;
+            } else {
+                result += char;
+                i++;
+            }
+        }
+    }
+    return result;
+}
+
+/**
+ * Multi-step JSON sanitiser for LLM output.
+ * Tries progressively more aggressive fixes until JSON.parse succeeds.
+ */
 function sanitizeLLMJson(jsonStr) {
-    // Replace single-quoted keys/values with double quotes
-    jsonStr = jsonStr.replace(/(?<=[{,\[\s])\s*'([^']+)'\s*:/g, '"$1":');
-    jsonStr = jsonStr.replace(/:\s*'([^']*)'/g, ': "$1"');
-    // Remove trailing commas before } or ]
-    jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1');
-    return JSON.parse(jsonStr);
+    // 1. Try direct parse (fast path)
+    try { return JSON.parse(jsonStr); } catch (_) { /* continue */ }
+
+    // 2. Light cleanup – trailing commas
+    let cleaned = jsonStr.replace(/,\s*([}\]])/g, '$1');
+    try { return JSON.parse(cleaned); } catch (_) { /* continue */ }
+
+    // 3. Fix unescaped characters inside string values
+    cleaned = fixJsonStringValues(cleaned);
+    cleaned = cleaned.replace(/,\s*([}\]])/g, '$1');
+    try { return JSON.parse(cleaned); } catch (_) { /* continue */ }
+
+    // 4. Handle single-quoted JSON (some models output this)
+    let singleQuoteFix = jsonStr
+        .replace(/(?<=[{,\[\s])\s*'([^']+)'\s*:/g, '"$1":')
+        .replace(/:\s*'([^']*)'/g, ': "$1"')
+        .replace(/,\s*([}\]])/g, '$1');
+    try { return JSON.parse(singleQuoteFix); } catch (_) { /* continue */ }
+
+    // 5. Apply string-value fixer on top of the single-quote fix
+    singleQuoteFix = fixJsonStringValues(singleQuoteFix);
+    singleQuoteFix = singleQuoteFix.replace(/,\s*([}\]])/g, '$1');
+    return JSON.parse(singleQuoteFix); // let it throw if still broken
 }
 
 const getGeminiResponse = async (req, res) => {
