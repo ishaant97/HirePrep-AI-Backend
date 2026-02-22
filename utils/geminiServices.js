@@ -226,15 +226,6 @@ CRITICAL OUTPUT RULES (MANDATORY):
   ]
 }
 
----
-
-### 🧠 **Experience Level Rules**
-- experience = 0–1 → "Entry-Level"
-- experience = 2–4 → "Mid-Level"
-- experience ≥ 5 → "Senior-Level"
-
----
-
 ### 🧪 **Example**
 
 #### Example Resume Text:
