@@ -3,6 +3,54 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 // Initialize the API client
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+// ── Model fallback chains (all Gemma = free tier, no daily cap) ──
+// NOTE: gemma-3-12b-it removed — experiencing prolonged 503 outage
+const MODELS = {
+    light: ["gemma-3-4b-it", "gemma-3-27b-it"],    // for simple tasks
+    medium: ["gemma-3-27b-it", "gemma-3-4b-it"],    // for resume parsing / ATS
+    heavy: ["gemma-3-27b-it", "gemma-3-4b-it"],     // for career roadmap
+};
+
+/**
+ * Retry a Gemini generateContent call with exponential back-off.
+ * On 503 / 429 it waits and retries; after exhausting retries it moves
+ * to the next model in the fallback list.
+ *
+ * @param {string[]} modelList  – ordered list of model names to try
+ * @param {string}   prompt     – the prompt text
+ * @param {number}   maxRetries – retries per model (default 3)
+ * @returns {string} the model's text response
+ */
+async function generateWithRetry(modelList, prompt, maxRetries = 3) {
+    for (const modelName of modelList) {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const model = genAI.getGenerativeModel({ model: modelName });
+                const result = await model.generateContent(prompt);
+                return result.response.text();
+            } catch (err) {
+                const status = err.status || err.statusCode || 0;
+                const isRetryable = status === 503 || status === 429;
+
+                if (isRetryable && attempt < maxRetries) {
+                    const delay = Math.min(1000 * 2 ** (attempt - 1), 8000); // 1s → 2s → 4s → 8s
+                    console.warn(
+                        `[Retry] ${modelName} returned ${status}. ` +
+                        `Waiting ${delay}ms before retry ${attempt + 1}/${maxRetries}…`
+                    );
+                    await new Promise((r) => setTimeout(r, delay));
+                } else if (isRetryable) {
+                    console.warn(`[Fallback] ${modelName} still ${status} after ${maxRetries} attempts, trying next model…`);
+                    break; // move to next model
+                } else {
+                    throw err; // non-retryable error → propagate immediately
+                }
+            }
+        }
+    }
+    throw new Error("All models unavailable after retries. Please try again later.");
+}
+
 /**
  * Walk through a JSON string character-by-character and fix:
  *  - Unescaped double quotes inside string values
@@ -115,19 +163,10 @@ const getGeminiResponse = async (req, res) => {
             return res.status(400).json({ error: "Prompt is required" });
         }
 
-        // 2. Select the model
-        const model = genAI.getGenerativeModel({
-            model: "gemma-3-4b-it"
-        });
+        // 2. Generate content with retry + fallback
+        const responseText = await generateWithRetry(MODELS.light, prompt);
 
-        // 3. Generate content
-        const result = await model.generateContent(prompt);
-        const responseText = result.response.text();
-
-        // const response = await model.generateContent(prompt);
-        // res.status(200).json(response);
-
-        // 4. Send the response back to the client
+        // 3. Send the response back to the client
         res.status(200).json({
             success: true,
             data: responseText
@@ -277,12 +316,7 @@ Hackathon Participation: Yes"
 ${resumeText}`;
 
     try {
-        const model = genAI.getGenerativeModel({
-            model: "gemma-3-4b-it"
-        });
-
-        const result = await model.generateContent(prompt);
-        const responseText = result.response.text();
+        const responseText = await generateWithRetry(MODELS.medium, prompt);
 
         // 1. Clean markdown code fences
         let cleaned = responseText
@@ -450,12 +484,7 @@ ${resumeData}
 `;
 
     try {
-        const model = genAI.getGenerativeModel({
-            model: "gemma-3-27b-it"
-        });
-
-        const result = await model.generateContent(prompt);
-        const responseText = result.response.text();
+        const responseText = await generateWithRetry(MODELS.medium, prompt);
 
         // 1. Clean markdown code fences
         let cleaned = responseText
@@ -587,12 +616,7 @@ Additional Constraints:
     `;
 
     try {
-        const model = genAI.getGenerativeModel({
-            model: "gemma-3-12b-it"
-        });
-
-        const result = await model.generateContent(prompt);
-        const responseText = result.response.text();
+        const responseText = await generateWithRetry(MODELS.heavy, prompt);
 
         // 1. Clean markdown code fences
         let cleaned = responseText
