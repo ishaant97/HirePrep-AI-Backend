@@ -95,7 +95,7 @@ async function processAnalyticsInBackground(resume, resumeData, extractedText) {
         // Step 1: ATS Evaluation
         if (extractedText && desiredRole) {
             try {
-                atsResult = await geminiATSResponseForResume(extractedText, desiredRole);
+                atsResult = await geminiATSResponseForResume(extractedText, desiredRole, experience_years);
                 if (atsResult && typeof atsResult === "object") {
                     analytics.ats_evaluation = atsResult;
                 }

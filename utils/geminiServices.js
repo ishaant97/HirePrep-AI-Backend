@@ -349,108 +349,116 @@ ${resumeText}`;
     }
 }
 
-const geminiATSResponseForResume = async (resumeData, desiredRole) => {
+const geminiATSResponseForResume = async (resumeData, desiredRole, experience_years) => {
     const prompt = `
-    You are an enterprise-grade Applicant Tracking System (ATS) resume evaluation engine.
+You are a professional ATS (Applicant Tracking System) resume evaluation engine, similar in rigor to Resume Worded or Jobscan.
 
-Your task is to evaluate the resume quality and role alignment strictly based on ATS standards used by modern recruiters.
+Evaluate resume quality AND role alignment using the scoring framework below.
 
-You must behave like a deterministic scoring system, NOT a career coach.
-
-The candidate has specified a desired job role.
-You must evaluate how well the resume aligns with that role.
+Be fair but firm — give credit where it is clearly earned, but do not round up or give benefit of the doubt.
+Score like an experienced recruiter reviewing hundreds of resumes: realistic, evidence-based, and calibrated.
 
 ========================================
-INPUTS PROVIDED:
-========================================
+INPUTS:
 1) Desired Role
-2) Resume Text
-
-You MUST use both inputs when scoring.
-
-========================================
-SCORING CRITERIA (Total = 100 Points)
+2) Experience Level (years)
+3) Resume Text
 ========================================
 
-1) Section Completeness (10 points)
-- Detect presence of:
-  - Professional Summary / Objective
-  - Education
-  - Skills
-  - Experience
-  - Projects
-  - Certifications
-- Deduct points for missing major sections.
+========================================
+SCORING RULES
+========================================
 
-2) Contact & Professional Links (5 points)
-- Email present
-- Phone present
-- LinkedIn present
-- Deduct if missing or poorly formatted.
+Each category has a strict MAX. Do NOT exceed it.
+Award points based on clear evidence in the resume text.
 
-3) Chronological Structure (10 points)
-- Experience and education should follow reverse chronological order.
-- Deduct for inconsistent date formats.
-- Deduct if dates are unclear or missing.
+1) Section Completeness (0–10)
+   - Standard sections: Contact, Summary/Objective, Experience, Education, Skills, Projects.
+   - Each missing major section = -2 points.
+   - Having all sections with reasonable content = 8–10.
 
-4) Experience Quality (15 points)
-- Clear role descriptions.
-- Bullet-point clarity.
-- Impact-focused descriptions.
-- Penalize vague responsibilities.
+2) Contact & Links (0–5)
+   - Email + Phone = 3. Add +1 for LinkedIn, +1 for GitHub/Portfolio.
+   - Full marks require all four.
 
-5) Quantified Achievements (10 points)
-- Reward usage of numbers, %, metrics, measurable impact.
-- Penalize if no measurable achievements are present.
+3) Chronology (0–10)
+   - Clear, consistent date ranges with no unexplained gaps = 8–10.
+   - Missing dates or unclear timelines = deduct proportionally.
+   - No dates at all = 0–2.
 
-6) Action Verbs Strength (10 points)
-- Reward strong action verbs (Developed, Implemented, Led, Designed, Optimized, Built, Created, Engineered).
+4) Experience Quality (0–15)
+   - Evaluate based on the candidate's experience level (${experience_years} years).
+   - For 0–1 years: internships, academic projects with real-world application, and relevant coursework can earn up to 8–10. Strong internship descriptions can reach 12.
+   - For 2+ years: expect professional roles with impact-driven descriptions.
+   - Vague bullet points ("worked on", "helped with") = cap at 5–6.
+   - Well-described roles with context and outcomes = 10–15.
+
+5) Quantified Achievements (0–10)
+   - Look for numbers, percentages, metrics, or measurable outcomes.
+   - Vague impact statements without data = 2–4.
+   - Some quantification = 5–7. Strong quantification throughout = 8–10.
+   - No quantification at all = 0–2.
+
+6) Action Verbs (0–10)
+   - Reward strong, varied action verbs ("developed", "implemented", "optimized", "reduced").
+   - Penalize weak/passive language ("responsible for", "worked on", "assisted").
+   - Repetitive verbs = -1 to -3.
+   - Good variety and strength = 7–10.
+
+7) Skills Strength (0–10)
+   - Skills must be relevant to the Desired Role.
+   - A well-curated, role-relevant skill list = 7–10.
+   - Generic filler skills (e.g., "MS Office" for a developer role) = deduct.
+   - Missing key skills expected for the role = deduct proportionally.
+
+8) Readability & Formatting (0–10)
+   - Clean structure, consistent formatting, easy to scan = 8–10.
+   - Dense paragraphs or inconsistent layout = 4–6.
+   - Poorly structured / hard to read = 0–3.
+
+9) Education Quality (0–5)
+   - Relevant degree + GPA mentioned = 4–5.
+   - Relevant degree, no GPA = 3.
+   - Irrelevant degree or missing education = 0–2.
+
+10) Role Alignment (0–15)
+    - How well does the overall resume position the candidate for the Desired Role?
+    - Strong alignment (matching skills, experience, projects) = 10–15.
+    - Partial alignment = 5–9.
+    - Weak or mismatched alignment = 0–4.
+
+SCORING CALIBRATION:
+- An average student resume (some projects, 1 internship, decent skills) should typically land around 45–60.
+- A well-crafted resume with quantified impact and strong role fit = 65–80.
+- Only outstanding resumes with everything polished should reach 80+.
+- Do NOT inflate scores — be realistic and consistent.
+
+========================================
+EVALUATION LOGIC
+========================================
+
+- Penalize missing sections proportionally.
+- Penalize vague or responsibility-only descriptions.
+- Reward quantified achievements (numbers, %, measurable impact).
+- Reward strong, varied action verbs.
 - Penalize repeated weak verbs.
-- Penalize passive language.
+- Penalize inconsistent or missing dates.
+- Penalize generic or irrelevant skills.
+- Evaluate role alignment using industry-standard expectations for the Desired Role.
+- Penalize missing core competencies expected for the role.
+- Adjust experience expectations based on the candidate's experience level.
 
-7) Skills Depth & Technical Strength (10 points)
-- Skills clearly listed.
-- Technical skills grouped properly.
-- Penalize overly generic skills.
-
-8) Readability & Formatting (10 points)
-- Clear structure.
-- Logical spacing.
-- Consistent bullet usage.
-- Professional tone.
-
-9) Education Quality (5 points)
-- CGPA/Percentage clarity.
-- Academic consistency.
-- Penalize missing details.
-
-10) Role Alignment Score (15 points)
-- Evaluate how well skills, projects, and experience match the Desired Role.
-- Reward relevant technical stack.
-- Penalize irrelevant content.
-- Penalize missing core competencies expected for that role.
-- Consider industry-standard skills for that role.
+Use ONLY the provided resume text.
+Do NOT hallucinate or assume information not present.
 
 ========================================
-CRITICAL RULES
+OUTPUT FORMAT (STRICT JSON ONLY)
 ========================================
 
-- Total score MUST be between 0 and 100.
-- Do NOT hallucinate missing sections.
-- Use ONLY the provided resume text.
-- Be strict but fair.
-- Do NOT inflate scores.
-- Do NOT explain scoring methodology.
-- Return STRICT JSON ONLY.
-- No markdown.
-- No extra commentary.
-
-========================================
-OUTPUT FORMAT (STRICT JSON)
-========================================
+Do NOT include "ats_score" — it will be calculated externally by summing the breakdown.
+Return ONLY the breakdown scores and analysis.
 
 {
-  "ats_score": number,
   "breakdown": {
     "section_completeness": number,
     "contact_score": number,
@@ -472,12 +480,16 @@ OUTPUT FORMAT (STRICT JSON)
   "improvement_suggestions": ["string"]
 }
 
+Return JSON only. No markdown. No commentary.
 ========================================
 INPUT DATA
 ========================================
 
 Desired Role:
 ${desiredRole}
+
+Experience Level:
+${experience_years} years
 
 Resume Text:
 ${resumeData}
@@ -500,7 +512,25 @@ ${resumeData}
             throw new Error("No JSON object found in AI response");
         }
 
-        return sanitizeLLMJson(match[0]);
+        const parsed = sanitizeLLMJson(match[0]);
+
+        // 3. Compute ats_score by summing all breakdown components
+        const breakdown = parsed.breakdown || {};
+        const ats_score =
+            (breakdown.section_completeness || 0) +
+            (breakdown.contact_score || 0) +
+            (breakdown.chronology_score || 0) +
+            (breakdown.experience_quality || 0) +
+            (breakdown.quantification_score || 0) +
+            (breakdown.action_verbs_score || 0) +
+            (breakdown.skills_score || 0) +
+            (breakdown.readability_score || 0) +
+            (breakdown.education_score || 0) +
+            (breakdown.role_alignment_score || 0);
+
+        parsed.ats_score = Math.min(ats_score, 100);
+
+        return parsed;
     } catch (error) {
         console.error("Error generating ATS evaluation:", error);
         throw new Error(`Failed to generate ATS evaluation: ${error.message}`);
