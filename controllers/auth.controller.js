@@ -2,6 +2,16 @@ const User = require('../models/user.model');
 const generateToken = require('../utils/generateToken');
 const bcrypt = require('bcryptjs');
 
+function getCookieOptions(maxAge) {
+    const isProduction = process.env.NODE_ENV === 'production';
+    return {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: isProduction ? 'none' : 'lax',
+        maxAge,
+    };
+}
+
 async function register(req, res) {
     const { name, collegeName, email, password } = req.body;
     const userExists = await User.findOne({ email });
@@ -19,12 +29,7 @@ async function register(req, res) {
     // const isLocalhostOrigin = corsOrigins.some((origin) => origin.includes("localhost"));
     // const shouldUseSecure = isProduction && !isLocalhostOrigin;
     res
-        .cookie("token", token, {
-            httpOnly: true,
-            secure: true,
-            sameSite: "none",
-            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-        })
+        .cookie("token", token, getCookieOptions(7 * 24 * 60 * 60 * 1000))
         .status(201)
         .json({
             message: 'User registered successfully',
@@ -56,12 +61,7 @@ async function login(req, res) {
     // const isLocalhostOrigin = corsOrigins.some((origin) => origin.includes("localhost"));
     // const shouldUseSecure = isProduction && !isLocalhostOrigin;
     res
-        .cookie("token", token, {
-            httpOnly: true,
-            secure: true,
-            sameSite: "none",
-            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-        })
+        .cookie("token", token, getCookieOptions(7 * 24 * 60 * 60 * 1000))
         .json({
             message: "Login successful",
             user: {
@@ -82,12 +82,7 @@ function logout(req, res) {
     // const isLocalhostOrigin = corsOrigins.some((origin) => origin.includes("localhost"));
     // const shouldUseSecure = isProduction && !isLocalhostOrigin;
     res
-        .cookie("token", "", {
-            httpOnly: true,
-            secure: true,
-            sameSite: "none",
-            maxAge: 0 // Expire the cookie immediately
-        })
+        .cookie("token", "", getCookieOptions(0))
         .json({ message: "Logout successful" });
 }
 

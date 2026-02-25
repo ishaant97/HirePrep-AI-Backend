@@ -153,13 +153,15 @@ async function parseResumeText(req, res) {
 
 async function viewResume(req, res) {
     try {
-        const resume = await Resume.findOne({
-            _id: req.params.id,
-            userId: req.user._id,
-        });
+        const resume = await Resume.findById(req.params.id);
 
         if (!resume) {
             return res.status(404).json({ error: "Resume not found" });
+        }
+
+        // Ownership check
+        if (resume.userId.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ error: "You do not have access to this resume" });
         }
 
         const targetUrl = new URL(resume.resumePdfUrl);
