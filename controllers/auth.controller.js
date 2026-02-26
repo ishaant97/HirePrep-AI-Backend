@@ -2,16 +2,6 @@ const User = require('../models/user.model');
 const generateToken = require('../utils/generateToken');
 const bcrypt = require('bcryptjs');
 
-function getCookieOptions(maxAge) {
-    const isProduction = process.env.NODE_ENV === 'production';
-    return {
-        httpOnly: true,
-        secure: isProduction,
-        sameSite: isProduction ? 'none' : 'lax',
-        maxAge,
-    };
-}
-
 async function register(req, res) {
     const { name, collegeName, email, password } = req.body;
     const userExists = await User.findOne({ email });
@@ -21,15 +11,13 @@ async function register(req, res) {
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await User.create({ name, collegeName, email, password: hashedPassword });
     const token = generateToken(user._id, user.email);
-    // const isProduction = process.env.NODE_ENV === "production";
-    // const corsOrigins = (process.env.CORS_ORIGIN || "")
-    //     .split(",")
-    //     .map((origin) => origin.trim())
-    //     .filter(Boolean);
-    // const isLocalhostOrigin = corsOrigins.some((origin) => origin.includes("localhost"));
-    // const shouldUseSecure = isProduction && !isLocalhostOrigin;
     res
-        .cookie("token", token, getCookieOptions(7 * 24 * 60 * 60 * 1000))
+        .cookie("token", token, {
+            httpOnly: true,
+            secure: true,
+            sameSite: "none",
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        })
         .status(201)
         .json({
             message: 'User registered successfully',
@@ -53,15 +41,13 @@ async function login(req, res) {
         return res.status(401).json({ message: "Invalid credentials" });
     }
     const token = generateToken(user._id, user.email);
-    // const isProduction = process.env.NODE_ENV === "production";
-    // const corsOrigins = (process.env.CORS_ORIGIN || "")
-    //     .split(",")
-    //     .map((origin) => origin.trim())
-    //     .filter(Boolean);
-    // const isLocalhostOrigin = corsOrigins.some((origin) => origin.includes("localhost"));
-    // const shouldUseSecure = isProduction && !isLocalhostOrigin;
     res
-        .cookie("token", token, getCookieOptions(7 * 24 * 60 * 60 * 1000))
+        .cookie("token", token, {
+            httpOnly: true,
+            secure: true,
+            sameSite: "none",
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        })
         .json({
             message: "Login successful",
             user: {
@@ -74,15 +60,13 @@ async function login(req, res) {
 }
 
 function logout(req, res) {
-    // const isProduction = process.env.NODE_ENV === "production";
-    // const corsOrigins = (process.env.CORS_ORIGIN || "")
-    //     .split(",")
-    //     .map((origin) => origin.trim())
-    //     .filter(Boolean);
-    // const isLocalhostOrigin = corsOrigins.some((origin) => origin.includes("localhost"));
-    // const shouldUseSecure = isProduction && !isLocalhostOrigin;
     res
-        .cookie("token", "", getCookieOptions(0))
+        .cookie("token", "", {
+            httpOnly: true,
+            secure: true,
+            sameSite: "none",
+            maxAge: 0 // Expire the cookie immediately
+        })
         .json({ message: "Logout successful" });
 }
 
