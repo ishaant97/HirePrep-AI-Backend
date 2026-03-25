@@ -17,6 +17,167 @@ function tryParseJson(value) {
     }
 }
 
+function toNumber(value, defaultValue = 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : defaultValue;
+}
+
+function normalizeStringArray(value) {
+    if (!Array.isArray(value)) return [];
+    return value
+        .map((item) => (typeof item === "string" ? item.trim() : ""))
+        .filter(Boolean);
+}
+
+function normalizeProjectsForML(value) {
+    if (!Array.isArray(value)) return [];
+    return value.map((project) => {
+        if (project && typeof project === "object") {
+            return project;
+        }
+        return {};
+    });
+}
+
+function normalizeInternshipsForML(value) {
+    if (!Array.isArray(value)) return [];
+    return value.map((internship) => {
+        if (!internship || typeof internship !== "object") {
+            return {};
+        }
+
+        return {
+            company: typeof internship.company === "string" ? internship.company.trim() : "",
+            role: typeof internship.role === "string" ? internship.role.trim() : "",
+        };
+    });
+}
+
+function buildMLAnalysisPayload(resumeData) {
+    return {
+        education: {
+            cgpa: String(resumeData.cgpa ?? ""),
+        },
+        skills: normalizeStringArray(resumeData.skills),
+        projects: normalizeProjectsForML(resumeData.project),
+        certifications: normalizeStringArray(resumeData.certifications),
+        internships: normalizeInternshipsForML(resumeData.internships),
+        experience: {
+            years: toNumber(resumeData.experience_years, 0),
+        },
+        career_preferences: {
+            desired_role: typeof resumeData.desired_role === "string"
+                ? resumeData.desired_role.trim()
+                : "",
+        },
+        placement_inputs: {
+            communication_rating: toNumber(resumeData.communication_rating, 0),
+            hackathon: (resumeData.hackathon === "Yes" || resumeData.hackathon === "No")
+                ? resumeData.hackathon
+                : "No",
+            twelfth_percent: toNumber(resumeData.twelfth_percent, 0),
+            tenth_percent: toNumber(resumeData.tenth_percent, 0),
+            backlogs: toNumber(resumeData.backlogs, 0),
+        },
+    };
+}
+
+function mapMLAnalysisResponse(mlResponse) {
+    if (!mlResponse || typeof mlResponse !== "object") {
+        return null;
+    }
+
+    const placement = mlResponse.placement_analysis;
+    const skill = mlResponse.skill_analysis;
+    const roleSource = mlResponse.role_recommendations;
+
+    const roleRecommendations = Array.isArray(roleSource)
+        ? roleSource
+        : Array.isArray(roleSource?.top_roles)
+            ? roleSource.top_roles
+            : [];
+
+    return {
+        placement_analysis: {
+            final_probability: toNumber(placement?.final_probability, 0),
+            interpretation: typeof placement?.interpretation === "string"
+                ? placement.interpretation
+                : "",
+        },
+        skill_analysis: {
+            desired_role: typeof skill?.desired_role === "string" ? skill.desired_role : "",
+            experience_level: typeof skill?.experience_level === "string" ? skill.experience_level : "",
+            total_skills_in_resume: toNumber(skill?.total_skills_in_resume, 0),
+            skill_match_percent: toNumber(skill?.skill_match_percent, 0),
+            matched_skills: normalizeStringArray(skill?.matched_skills),
+            missing_skills: normalizeStringArray(skill?.missing_skills),
+            matched_count: toNumber(skill?.matched_count, 0),
+            missing_count: toNumber(skill?.missing_count, 0),
+        },
+        role_recommendations: roleRecommendations.map((role, index) => ({
+            rank: toNumber(role?.rank, index + 1),
+            role: typeof role?.role === "string" ? role.role : "",
+            experience_level: typeof role?.experience_level === "string" ? role.experience_level : "",
+            skill_match_percent: toNumber(role?.skill_match_percent, 0),
+            matched_skills: normalizeStringArray(role?.matched_skills),
+            skills_to_learn: normalizeStringArray(role?.skills_to_learn),
+        })),
+    };
+}
+
+function postJson(url, payload, timeoutMs = 45000) {
+    const targetUrl = new URL(url);
+    const client = targetUrl.protocol === "https:" ? https : http;
+    const requestBody = JSON.stringify(payload);
+
+    const options = {
+        protocol: targetUrl.protocol,
+        hostname: targetUrl.hostname,
+        port: targetUrl.port || undefined,
+        path: `${targetUrl.pathname}${targetUrl.search}`,
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Content-Length": Buffer.byteLength(requestBody),
+        },
+    };
+
+    return new Promise((resolve, reject) => {
+        const req = client.request(options, (response) => {
+            let body = "";
+
+            response.on("data", (chunk) => {
+                body += chunk;
+            });
+
+            response.on("end", () => {
+                const isSuccess = response.statusCode && response.statusCode >= 200 && response.statusCode < 300;
+                if (!isSuccess) {
+                    return reject(
+                        new Error(`ML API request failed with status ${response.statusCode}: ${body}`)
+                    );
+                }
+
+                try {
+                    const parsed = body ? JSON.parse(body) : {};
+                    resolve(parsed);
+                } catch (parseError) {
+                    reject(new Error(`Invalid JSON from ML API: ${parseError.message}`));
+                }
+            });
+        });
+
+        req.on("error", reject);
+
+        req.setTimeout(timeoutMs, () => {
+            req.destroy(new Error(`ML API request timed out after ${timeoutMs}ms`));
+        });
+
+        req.write(requestBody);
+        req.end();
+    });
+}
+
 async function saveResume(req, res) {
     try {
         if (!req.file || !req.file.buffer) {
@@ -120,7 +281,23 @@ async function processAnalyticsInBackground(resume, resumeData, extractedText) {
             }
         }
 
-        // Step 3: Patch the resume with analytics
+        // Step 3: Machine learning backend evaluation
+        try {
+            const mlApiUrl =
+                process.env.ML_COMPLETE_ANALYSIS_URL;
+
+            const mlPayload = buildMLAnalysisPayload(resumeData);
+            const mlResponse = await postJson(mlApiUrl, mlPayload);
+            const mappedML = mapMLAnalysisResponse(mlResponse);
+
+            if (mappedML && typeof mappedML === "object") {
+                analytics.machine_learning_evaluation = mappedML;
+            }
+        } catch (mlError) {
+            console.error("ML evaluation failed:", mlError.message);
+        }
+
+        // Step 4: Patch the resume with analytics
         const updateFields = { analyticsStatus: "completed" };
         if (Object.keys(analytics).length > 0) {
             updateFields.analytics = analytics;

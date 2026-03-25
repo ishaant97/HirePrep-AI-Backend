@@ -179,7 +179,39 @@ const resumeSchema = new mongoose.Schema(
                     profile_competitiveness_boost: { type: String },
                     expected_outcome_if_followed: { type: String }
                 }
-            }
+            },
+
+            machine_learning_evaluation: {
+                placement_analysis: {
+                    final_probability: { type: Number, min: 0, max: 100 },
+                    interpretation: { type: String }
+                },
+
+                skill_analysis: {
+                    desired_role: { type: String },
+                    experience_level: { type: String },
+                    total_skills_in_resume: { type: Number },
+
+                    skill_match_percent: { type: Number, min: 0, max: 100 },
+
+                    matched_skills: [{ type: String }],
+                    missing_skills: [{ type: String }],
+
+                    matched_count: { type: Number },
+                    missing_count: { type: Number }
+                },
+
+                role_recommendations: [
+                    {
+                        rank: { type: Number },
+                        role: { type: String },
+                        experience_level: { type: String },
+                        skill_match_percent: { type: Number },
+                        matched_skills: [{ type: String }],
+                        skills_to_learn: [{ type: String }]
+                    }
+                ],
+            },
         },
     },
     { timestamps: true }
