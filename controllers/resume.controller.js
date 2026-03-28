@@ -297,7 +297,10 @@ async function processAnalyticsInBackground(resume, resumeData, extractedText) {
             console.error("ML evaluation failed:", mlError.message);
         }
 
-        // Step 4: Patch the resume with analytics
+        // Step 4: Add all skills to analytics
+        analytics.machine_learning_evaluation.skills = skills;
+
+        // Step 5: Patch the resume with analytics
         const updateFields = { analyticsStatus: "completed" };
         if (Object.keys(analytics).length > 0) {
             updateFields.analytics = analytics;

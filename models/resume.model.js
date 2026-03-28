@@ -121,7 +121,6 @@ const resumeSchema = new mongoose.Schema(
         },
 
         // Analytics
-
         analytics: {
             ats_evaluation: {
                 ats_score: { type: Number, min: 0, max: 100 },
@@ -182,6 +181,10 @@ const resumeSchema = new mongoose.Schema(
             },
 
             machine_learning_evaluation: {
+                skills: [{
+                    type: String, // Storing skill names
+                    trim: true
+                }],
                 placement_analysis: {
                     final_probability: { type: Number, min: 0, max: 100 },
                     interpretation: { type: String }
