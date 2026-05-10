@@ -18,30 +18,30 @@ const MODELS = {
     light: parseModelList(
         process.env.GEMINI_LIGHT_MODELS,
         [
-            "gemma-4-31b-it",
-            "gemma-4-26b-a4b-it",
             "gemini-2.0-flash",
             "gemini-2.5-flash",
+            "gemma-4-31b-it",
+            "gemma-4-26b-a4b-it",
             "gemini-flash-latest",
         ]
     ),
     medium: parseModelList(
         process.env.GEMINI_MEDIUM_MODELS,
         [
-            "gemma-4-31b-it",
-            "gemma-4-26b-a4b-it",
             "gemini-2.5-flash",
             "gemini-2.5-pro",
+            "gemma-4-31b-it",
+            "gemma-4-26b-a4b-it",
             "gemini-pro-latest",
         ]
     ),
     heavy: parseModelList(
         process.env.GEMINI_HEAVY_MODELS,
         [
-            "gemma-4-31b-it",
-            "gemma-4-26b-a4b-it",
             "gemini-2.5-pro",
             "gemini-pro-latest",
+            "gemma-4-31b-it",
+            "gemma-4-26b-a4b-it",
             "gemini-2.5-flash",
         ]
     ),
