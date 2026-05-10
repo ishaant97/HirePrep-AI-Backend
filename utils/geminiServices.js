@@ -1,10 +1,11 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const JSON5 = require("json5");
 
 // Initialize the API client
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Gemma-only fallback chains. The API key can expose different Gemma IDs,
-// so we try both legacy instruction-tuned names and newer bare model names.
+// Fallback chains. The API key can expose different model IDs,
+// so we try newer Gemini models first with sensible fallbacks.
 // Environment overrides let the deployment pin the exact allowlisted models.
 function parseModelList(envValue, defaultList) {
     return (envValue || defaultList.join(","))
@@ -16,15 +17,33 @@ function parseModelList(envValue, defaultList) {
 const MODELS = {
     light: parseModelList(
         process.env.GEMINI_LIGHT_MODELS,
-        ["gemma-4-26b-a4b-it", "gemma-4-31b-it"]
+        [
+            "gemma-4-31b-it",
+            "gemma-4-26b-a4b-it",
+            "gemini-2.0-flash",
+            "gemini-2.5-flash",
+            "gemini-flash-latest",
+        ]
     ),
     medium: parseModelList(
         process.env.GEMINI_MEDIUM_MODELS,
-        ["gemma-4-26b-a4b-it", "gemma-4-31b-it"]
+        [
+            "gemma-4-31b-it",
+            "gemma-4-26b-a4b-it",
+            "gemini-2.5-flash",
+            "gemini-2.5-pro",
+            "gemini-pro-latest",
+        ]
     ),
     heavy: parseModelList(
         process.env.GEMINI_HEAVY_MODELS,
-        ["gemma-4-31b-it", "gemma-4-26b-a4b-it"]
+        [
+            "gemma-4-31b-it",
+            "gemma-4-26b-a4b-it",
+            "gemini-2.5-pro",
+            "gemini-pro-latest",
+            "gemini-2.5-flash",
+        ]
     ),
 };
 
@@ -47,7 +66,8 @@ async function generateWithRetry(modelList, prompt, maxRetries = 3) {
                 return result.response.text();
             } catch (err) {
                 const status = err.status || err.statusCode || 0;
-                const isRetryable = status === 503 || status === 429;
+                const retryableStatus = new Set([429, 500, 502, 503, 504]);
+                const isRetryable = retryableStatus.has(status);
                 const isUnavailableModel = status === 404;
 
                 if (isUnavailableModel) {
@@ -147,16 +167,79 @@ function fixJsonStringValues(str) {
     return result;
 }
 
+function normalizeJsonInput(jsonStr) {
+    return jsonStr
+        .replace(/^\uFEFF/, "")
+        .replace(/[\u201C\u201D]/g, '"')
+        .replace(/[\u2018\u2019]/g, "'")
+        .replace(/\u00A0/g, " ");
+}
+
+function quoteBarewordValues(str) {
+    return str.replace(
+        /:\s*(?!["{\[\d\-]|true\b|false\b|null\b)([^,\]}\n\r]+)/gi,
+        (match, value) => {
+            const trimmed = value.trim();
+
+            if (!trimmed) {
+                return match;
+            }
+
+            const escaped = trimmed.replace(/"/g, "\\\"");
+            return `: "${escaped}"`;
+        }
+    );
+}
+
+function quoteBarewordArrayItems(str) {
+    return str.replace(/\[([^\]]*)\]/g, (match, content) => {
+        if (content.includes("{")) {
+            return match;
+        }
+
+        const parts = content.split(",");
+
+        if (parts.length <= 1) {
+            return match;
+        }
+
+        const quotedParts = parts.map((part) => {
+            const trimmed = part.trim();
+
+            if (!trimmed) {
+                return trimmed;
+            }
+
+            if (
+                trimmed.startsWith('"') ||
+                trimmed.startsWith("'") ||
+                trimmed.startsWith("{") ||
+                trimmed.startsWith("[") ||
+                /^-?\d/.test(trimmed) ||
+                /^(true|false|null)$/i.test(trimmed)
+            ) {
+                return trimmed;
+            }
+
+            const escaped = trimmed.replace(/"/g, "\\\"");
+            return `"${escaped}"`;
+        });
+
+        return `[${quotedParts.join(", ")}]`;
+    });
+}
+
 /**
  * Multi-step JSON sanitiser for LLM output.
  * Tries progressively more aggressive fixes until JSON.parse succeeds.
  */
 function sanitizeLLMJson(jsonStr) {
+    const normalized = normalizeJsonInput(jsonStr);
     // 1. Try direct parse (fast path)
-    try { return JSON.parse(jsonStr); } catch (_) { /* continue */ }
+    try { return JSON.parse(normalized); } catch (_) { /* continue */ }
 
     // 2. Light cleanup – trailing commas
-    let cleaned = jsonStr.replace(/,\s*([}\]])/g, '$1');
+    let cleaned = normalized.replace(/,\s*([}\]])/g, '$1');
     try { return JSON.parse(cleaned); } catch (_) { /* continue */ }
 
     // 3. Fix unescaped characters inside string values
@@ -165,17 +248,78 @@ function sanitizeLLMJson(jsonStr) {
     try { return JSON.parse(cleaned); } catch (_) { /* continue */ }
 
     // 4. Handle single-quoted JSON (some models output this)
-    let singleQuoteFix = jsonStr
+    let singleQuoteFix = normalized
         .replace(/(?<=[{,\[\s])\s*'([^']+)'\s*:/g, '"$1":')
         .replace(/:\s*'([^']*)'/g, ': "$1"')
         .replace(/,\s*([}\]])/g, '$1');
     try { return JSON.parse(singleQuoteFix); } catch (_) { /* continue */ }
 
-    // 5. Apply string-value fixer on top of the single-quote fix
-    singleQuoteFix = fixJsonStringValues(singleQuoteFix);
-    singleQuoteFix = singleQuoteFix.replace(/,\s*([}\]])/g, '$1');
-    return JSON.parse(singleQuoteFix); // let it throw if still broken
+    // 5. Handle unquoted keys like {name: "value"}
+    let unquotedKeyFix = singleQuoteFix
+        .replace(/([{,]\s*)([A-Za-z_][A-Za-z0-9_]*)(\s*:)/g, '$1"$2"$3')
+        .replace(/,\s*([}\]])/g, '$1');
+    try { return JSON.parse(unquotedKeyFix); } catch (_) { /* continue */ }
+
+    // 6. Apply string-value fixer on top of the unquoted-key fix
+    unquotedKeyFix = fixJsonStringValues(unquotedKeyFix);
+    unquotedKeyFix = unquotedKeyFix.replace(/,\s*([}\]])/g, '$1');
+    try { return JSON.parse(unquotedKeyFix); } catch (_) { /* continue */ }
+
+    // 7. Quote bareword values and simple string arrays
+    let looseFix = quoteBarewordValues(unquotedKeyFix);
+    looseFix = quoteBarewordArrayItems(looseFix);
+    looseFix = looseFix.replace(/,\s*([}\]])/g, '$1');
+    try { return JSON.parse(looseFix); } catch (_) { /* continue */ }
+
+    // 8. JSON5 fallback for remaining edge cases
+    return JSON5.parse(looseFix);
 }
+
+// Extract the last complete JSON object from a mixed LLM response.
+function extractLastJsonObject(text) {
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    let start = -1;
+    let lastCandidate = null;
+
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+
+        if (inString) {
+            if (escaped) {
+                escaped = false;
+            } else if (char === "\\") {
+                escaped = true;
+            } else if (char === '"') {
+                inString = false;
+            }
+            continue;
+        }
+
+        if (char === '"') {
+            inString = true;
+            continue;
+        }
+
+        if (char === "{") {
+            if (depth === 0) {
+                start = i;
+            }
+            depth++;
+        } else if (char === "}") {
+            if (depth > 0) {
+                depth--;
+                if (depth === 0 && start !== -1) {
+                    lastCandidate = text.slice(start, i + 1);
+                }
+            }
+        }
+    }
+
+    return lastCandidate;
+}
+
 
 const getGeminiResponse = async (req, res) => {
     try {
@@ -348,15 +492,15 @@ ${resumeText}`;
             .trim();
 
         // 2. Extract JSON safely (in case extra text sneaks in)
-        const match = cleaned.match(/\{[\s\S]*\}/);
+        const jsonPayload = extractLastJsonObject(cleaned);
 
-        if (!match) {
+        if (!jsonPayload) {
             console.error("AI Response (no JSON found):", responseText);
             throw new Error("No JSON object found in AI response");
         }
 
         // 3. Parse JSON (with LLM output sanitization)
-        const parsed = sanitizeLLMJson(match[0]);
+        const parsed = sanitizeLLMJson(jsonPayload);
 
         // 4. Validate required fields exist
         if (!parsed.name && !parsed.email && !parsed.skills) {
@@ -528,14 +672,14 @@ ${resumeData}
             .trim();
 
         // 2. Extract JSON safely (in case extra text sneaks in)
-        const match = cleaned.match(/\{[\s\S]*\}/);
+        const jsonPayload = extractLastJsonObject(cleaned);
 
-        if (!match) {
+        if (!jsonPayload) {
             console.error("AI Response (no JSON found):", responseText);
             throw new Error("No JSON object found in AI response");
         }
 
-        const parsed = sanitizeLLMJson(match[0]);
+        const parsed = sanitizeLLMJson(jsonPayload);
 
         // 3. Compute ats_score by summing all breakdown components
         const breakdown = parsed.breakdown || {};
@@ -678,14 +822,14 @@ Additional Constraints:
             .trim();
 
         // 2. Extract JSON safely (in case extra text sneaks in)
-        const match = cleaned.match(/\{[\s\S]*\}/);
+        const jsonPayload = extractLastJsonObject(cleaned);
 
-        if (!match) {
+        if (!jsonPayload) {
             console.error("AI Response (no JSON found):", responseText);
             throw new Error("No JSON object found in AI response");
         }
 
-        return sanitizeLLMJson(match[0]);
+        return sanitizeLLMJson(jsonPayload);
     } catch (error) {
         console.error("Error generating career roadmap:", error);
         throw new Error(`Failed to generate career roadmap: ${error.message}`);
