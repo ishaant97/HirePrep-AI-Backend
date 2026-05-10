@@ -3,12 +3,29 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 // Initialize the API client
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// ── Model fallback chains (all Gemma = free tier, no daily cap) ──
-// NOTE: gemma-3-12b-it removed — experiencing prolonged 503 outage
+// Gemma-only fallback chains. The API key can expose different Gemma IDs,
+// so we try both legacy instruction-tuned names and newer bare model names.
+// Environment overrides let the deployment pin the exact allowlisted models.
+function parseModelList(envValue, defaultList) {
+    return (envValue || defaultList.join(","))
+        .split(",")
+        .map((model) => model.trim())
+        .filter(Boolean);
+}
+
 const MODELS = {
-    light: ["gemma-3-4b-it", "gemma-3-27b-it"],    // for simple tasks
-    medium: ["gemma-3-27b-it", "gemma-3-4b-it"],    // for resume parsing / ATS
-    heavy: ["gemma-3-27b-it", "gemma-3-4b-it"],     // for career roadmap
+    light: parseModelList(
+        process.env.GEMINI_LIGHT_MODELS,
+        ["gemma-4-26b-a4b-it", "gemma-4-31b-it"]
+    ),
+    medium: parseModelList(
+        process.env.GEMINI_MEDIUM_MODELS,
+        ["gemma-4-26b-a4b-it", "gemma-4-31b-it"]
+    ),
+    heavy: parseModelList(
+        process.env.GEMINI_HEAVY_MODELS,
+        ["gemma-4-31b-it", "gemma-4-26b-a4b-it"]
+    ),
 };
 
 /**
@@ -31,6 +48,12 @@ async function generateWithRetry(modelList, prompt, maxRetries = 3) {
             } catch (err) {
                 const status = err.status || err.statusCode || 0;
                 const isRetryable = status === 503 || status === 429;
+                const isUnavailableModel = status === 404;
+
+                if (isUnavailableModel) {
+                    console.warn(`[Fallback] ${modelName} is not available for this API key or API version, trying next model…`);
+                    break;
+                }
 
                 if (isRetryable && attempt < maxRetries) {
                     const delay = Math.min(1000 * 2 ** (attempt - 1), 8000); // 1s → 2s → 4s → 8s
