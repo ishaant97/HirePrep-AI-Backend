@@ -6,45 +6,28 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // Fallback chains. The API key can expose different model IDs,
 // so we try newer Gemini models first with sensible fallbacks.
-// Environment overrides let the deployment pin the exact allowlisted models.
-function parseModelList(envValue, defaultList) {
-    return (envValue || defaultList.join(","))
-        .split(",")
-        .map((model) => model.trim())
-        .filter(Boolean);
-}
-
 const MODELS = {
-    light: parseModelList(
-        process.env.GEMINI_LIGHT_MODELS,
-        [
-            "gemma-4-31b-it",
-            "gemma-4-26b-a4b-it",
-            "gemini-2.0-flash",
-            "gemini-2.5-flash",
-            "gemini-flash-latest",
-        ]
-    ),
-    medium: parseModelList(
-        process.env.GEMINI_MEDIUM_MODELS,
-        [
-            "gemma-4-31b-it",
-            "gemma-4-26b-a4b-it",
-            "gemini-2.5-flash",
-            "gemini-2.5-pro",
-            "gemini-pro-latest",
-        ]
-    ),
-    heavy: parseModelList(
-        process.env.GEMINI_HEAVY_MODELS,
-        [
-            "gemma-4-31b-it",
-            "gemma-4-26b-a4b-it",
-            "gemini-2.5-pro",
-            "gemini-pro-latest",
-            "gemini-2.5-flash",
-        ]
-    ),
+    light: [
+        "gemma-4-31b-it",
+        "gemma-4-26b-a4b-it",
+        "gemini-2.0-flash",
+        "gemini-2.5-flash",
+        "gemini-flash-latest",
+    ],
+    medium: [
+        "gemma-4-31b-it",
+        "gemma-4-26b-a4b-it",
+        "gemini-2.5-flash",
+        "gemini-2.5-pro",
+        "gemini-pro-latest",
+    ],
+    heavy: [
+        "gemma-4-31b-it",
+        "gemma-4-26b-a4b-it",
+        "gemini-2.5-pro",
+        "gemini-pro-latest",
+        "gemini-2.5-flash",
+    ],
 };
 
 function isGemma4Model(modelName) {
