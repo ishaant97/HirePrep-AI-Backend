@@ -28,8 +28,8 @@ const MODELS = {
     medium: parseModelList(
         process.env.GEMINI_MEDIUM_MODELS,
         [
-            "gemma-4-31b-it",
             "gemma-4-26b-a4b-it",
+            "gemma-4-31b-it",
             "gemini-2.5-flash",
             "gemini-2.5-pro",
             "gemini-pro-latest",
@@ -47,6 +47,10 @@ const MODELS = {
     ),
 };
 
+function isGemma4Model(modelName) {
+    return typeof modelName === "string" && modelName.startsWith("gemma-4");
+}
+
 /**
  * Retry a Gemini generateContent call with exponential back-off.
  * On 503 / 429 it waits and retries; after exhausting retries it moves
@@ -61,7 +65,10 @@ async function generateWithRetry(modelList, prompt, maxRetries = 3) {
     for (const modelName of modelList) {
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                const model = genAI.getGenerativeModel({ model: modelName });
+                const requestOptions = isGemma4Model(modelName)
+                    ? { apiVersion: "v1beta" }
+                    : undefined;
+                const model = genAI.getGenerativeModel({ model: modelName }, requestOptions);
                 const result = await model.generateContent(prompt);
                 return result.response.text();
             } catch (err) {
