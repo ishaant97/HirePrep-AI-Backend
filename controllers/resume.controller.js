@@ -287,7 +287,8 @@ async function processAnalyticsInBackground(resume, resumeData, extractedText) {
                 process.env.ML_COMPLETE_ANALYSIS_URL;
 
             const mlPayload = buildMLAnalysisPayload(resumeData);
-            const mlResponse = await postJson(mlApiUrl, mlPayload);
+            const mlTimeoutMs = toNumber(process.env.ML_API_TIMEOUT_MS, 45000);
+            const mlResponse = await postJson(mlApiUrl, mlPayload, mlTimeoutMs);
             const mappedML = mapMLAnalysisResponse(mlResponse);
 
             if (mappedML && typeof mappedML === "object") {
@@ -298,7 +299,10 @@ async function processAnalyticsInBackground(resume, resumeData, extractedText) {
         }
 
         // Step 4: Add all skills to analytics
-        analytics.machine_learning_evaluation.skills = skills;
+        analytics.machine_learning_evaluation = {
+            ...(analytics.machine_learning_evaluation || {}),
+            skills,
+        };
 
         // Step 5: Patch the resume with analytics
         const updateFields = { analyticsStatus: "completed" };
